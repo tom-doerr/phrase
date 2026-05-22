@@ -12,6 +12,7 @@ from .core import (
     read,
     read_file,
 )
+from .mnemonic import DEFAULT_MNEMONIC_MODEL, MnemonicDependencyError, build_prompt, generate_mnemonic
 
 __all__ = [
     "Generator",
@@ -20,10 +21,14 @@ __all__ = [
     "available_languages",
     "digit_choices",
     "generate",
+    "DEFAULT_MNEMONIC_MODEL",
+    "MnemonicDependencyError",
+    "build_prompt",
+    "generate_mnemonic",
     "prefix_entries",
     "prefix_wordlist",
     "read",
     "read_file",
 ]
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"

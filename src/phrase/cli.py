@@ -7,6 +7,7 @@ from typing import Sequence
 
 from . import __version__
 from .core import Generator, available_languages, read_file
+from .mnemonic import DEFAULT_MNEMONIC_MODEL, MnemonicDependencyError, generate_mnemonic
 
 
 def _installed_version() -> str:
@@ -40,6 +41,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--prefix-length",
         type=int,
         help="Use unique first-N-character prefixes as generated words",
+    )
+    parser.add_argument(
+        "--mnemonic",
+        action="store_true",
+        help="Generate a local-LLM mnemonic after the password is generated",
+    )
+    parser.add_argument(
+        "--mnemonic-model",
+        default=DEFAULT_MNEMONIC_MODEL,
+        help="Hugging Face model id or local model path for --mnemonic",
+    )
+    parser.add_argument(
+        "--mnemonic-local-files-only",
+        action="store_true",
+        help="Only load mnemonic model files already present in the local HF cache/path",
+    )
+    parser.add_argument(
+        "--mnemonic-max-new-tokens",
+        type=int,
+        default=96,
+        help="Maximum tokens to generate for mnemonic output",
+    )
+    parser.add_argument(
+        "--mnemonic-temperature",
+        type=float,
+        default=0.6,
+        help="Sampling temperature for mnemonic output",
     )
     parser.add_argument(
         "-l",
@@ -85,8 +113,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             if full_phrase is not None:
                 print(full_phrase)
             print(phrase)
+            if args.mnemonic:
+                mnemonic = generate_mnemonic(
+                    phrase,
+                    full_phrase,
+                    model_id=args.mnemonic_model,
+                    max_new_tokens=args.mnemonic_max_new_tokens,
+                    temperature=args.mnemonic_temperature,
+                    local_files_only=args.mnemonic_local_files_only,
+                )
+                print(f"mnemonic: {mnemonic}")
             print(f"entropy: {entropy_bits:.2f} bits")
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, MnemonicDependencyError) as exc:
         parser.exit(1, f"{parser.prog}: {exc}\n")
 
     return 0

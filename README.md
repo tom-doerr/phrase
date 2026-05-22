@@ -15,6 +15,10 @@ Or install the current checkout for development:
 
     $ python -m pip install -e ".[dev]"
 
+Install local mnemonic-generation dependencies when you want `--mnemonic`:
+
+    $ python -m pip install -e ".[mnemonic]"
+
 ### Download
 
 Just download the
@@ -35,12 +39,20 @@ Generate random passphrase:
     $ phrase
     correct horse battery staple
 
-Generate a German passphrase from unique four-character word prefixes:
+Generate a German passphrase from unique three-character word prefixes:
 
-    $ phrase -l de -w 6 --prefix-length 4
-    erdbeben schwer dynamit neidisch muffin reizvoll
-    erdb schw dyna neid muff reiz
-    entropy: 72.21 bits
+    $ phrase -l de -w 8 --prefix-length 3
+    rommee emmy spicken bahn butter litschi zinken frost
+    rom emm spi bah but lit zin fro
+    entropy: 85.55 bits
+
+Generate a local-only mnemonic after the password material is fixed. The model is loaded in-process through Hugging Face Transformers; the LLM only sees the already-generated password material and must not choose or alter it:
+
+    $ phrase -l de -w 8 --prefix-length 3 --mnemonic --mnemonic-model Qwen/Qwen3.5-0.8B
+    rommee emmy spicken bahn butter litschi zinken frost
+    rom emm spi bah but lit zin fro
+    mnemonic: Rommee-Emmy spickt Bahn-Butter-Litschi, zinkt Frost.
+    entropy: 85.55 bits
 
 Use the Python API:
 

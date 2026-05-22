@@ -20,6 +20,7 @@ from phrase import (
 )
 from phrase.cli import main
 from phrase.core import random_int, random_number
+from phrase.mnemonic import build_prompt
 
 
 def test_wordlists_are_available() -> None:
@@ -169,3 +170,47 @@ def test_cli_uses_prefix_length(tmp_path, capsys) -> None:
     assert main(["-w", "2", "-f", str(wordlist), "--prefix-length", "3"]) == 0
 
     assert capsys.readouterr().out == "gopher gopher\ngop gop\nentropy: 0.00 bits\n"
+
+def test_build_prompt_keeps_password_and_mnemonic_separate() -> None:
+    prompt = build_prompt("rom emm spi", "rommee emmy spicken")
+
+    assert "Password prefixes: rom emm spi" in prompt
+    assert "Full source words: rommee emmy spicken" in prompt
+    assert "Do not change" in prompt
+
+
+def test_cli_generates_local_mnemonic(monkeypatch, tmp_path, capsys) -> None:
+    wordlist = tmp_path / "wordlist.txt"
+    wordlist.write_text("11111\tgopher\n", encoding="utf-8")
+
+    def fake_mnemonic(prefix_phrase, full_phrase=None, **kwargs):
+        assert prefix_phrase == "gop"
+        assert full_phrase == "gopher"
+        assert kwargs["model_id"] == "test/model"
+        return "Gopher remembers gop."
+
+    monkeypatch.setattr("phrase.cli.generate_mnemonic", fake_mnemonic)
+
+    assert (
+        main(
+            [
+                "-w",
+                "1",
+                "-f",
+                str(wordlist),
+                "--prefix-length",
+                "3",
+                "--mnemonic",
+                "--mnemonic-model",
+                "test/model",
+            ]
+        )
+        == 0
+    )
+
+    assert capsys.readouterr().out == (
+        "gopher\n"
+        "gop\n"
+        "mnemonic: Gopher remembers gop.\n"
+        "entropy: 0.00 bits\n"
+    )
