@@ -57,6 +57,13 @@ def random_int(max_value: int) -> int:
     return secrets.randbelow(max_value)
 
 
+def prefix_wordlist(wordlist: Sequence[str], length: int) -> list[str]:
+    """Return sorted unique prefixes for a truncation length."""
+    if length <= 0:
+        raise ValueError("prefix_length must be greater than zero")
+    return sorted({word[:length] for word in wordlist})
+
+
 def random_words(wordlist: Sequence[str], count: int) -> list[str]:
     """Return count secure random words from wordlist."""
     if not wordlist:
@@ -84,6 +91,7 @@ class Generator:
     separator: str = ""
     capitalize: bool = False
     digits: int = 0
+    prefix_length: int | None = None
 
     def phrase(self) -> str:
         wordlist = self.wordlist
@@ -93,6 +101,9 @@ class Generator:
             except KeyError as exc:
                 raise UnknownLanguageError(f"no such language: {self.language}") from exc
             self.wordlist = wordlist
+
+        if self.prefix_length is not None:
+            wordlist = prefix_wordlist(wordlist or [], self.prefix_length)
 
         passphrase = random_words(wordlist or [], self.words)
         if self.capitalize:
@@ -113,6 +124,7 @@ def generate(
     separator: str = " ",
     capitalize: bool = False,
     digits: int = 0,
+    prefix_length: int | None = None,
 ) -> str:
     """Generate a passphrase with the same defaults as the CLI."""
     return Generator(
@@ -122,4 +134,5 @@ def generate(
         separator=separator,
         capitalize=capitalize,
         digits=digits,
+        prefix_length=prefix_length,
     ).phrase()

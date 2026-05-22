@@ -37,6 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-d", "--digits", type=int, default=0, help="Digits per passphrase")
     parser.add_argument(
+        "--prefix-length",
+        type=int,
+        help="Use unique first-N-character prefixes as generated words",
+    )
+    parser.add_argument(
         "-l",
         "--language",
         choices=available_languages(),
@@ -72,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             separator=args.separator,
             capitalize=args.capitalize,
             digits=args.digits,
+            prefix_length=args.prefix_length,
         )
         for _ in range(args.passphrases):
             print(generator.phrase())

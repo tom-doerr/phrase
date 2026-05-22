@@ -6,6 +6,7 @@ from .core import (
     UnknownLanguageError,
     available_languages,
     generate,
+    prefix_wordlist,
     read,
     read_file,
 )
@@ -16,8 +17,9 @@ __all__ = [
     "WORDLISTS",
     "available_languages",
     "generate",
+    "prefix_wordlist",
     "read",
     "read_file",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

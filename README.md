@@ -35,6 +35,11 @@ Generate random passphrase:
     $ phrase
     correct horse battery staple
 
+Generate a German passphrase from unique four-character word prefixes:
+
+    $ phrase -l de -w 6 --prefix-length 4
+    erdb schw dyna neid muff reiz
+
 Use the Python API:
 
     >>> from phrase import generate

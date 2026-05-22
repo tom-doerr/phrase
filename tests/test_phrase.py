@@ -11,6 +11,7 @@ from phrase import (
     UnknownLanguageError,
     available_languages,
     generate,
+    prefix_wordlist,
     read,
     read_file,
 )
@@ -53,6 +54,21 @@ def test_generator_uses_custom_wordlist() -> None:
     generator = Generator(wordlist=["gopher"], words=2, separator=" ")
 
     assert generator.phrase() == "gopher gopher"
+
+
+def test_prefix_wordlist_keeps_unique_prefixes() -> None:
+    assert prefix_wordlist(["alpha", "alpine", "bravo"], 2) == ["al", "br"]
+
+
+def test_generator_uses_prefix_length() -> None:
+    generator = Generator(wordlist=["gopher"], words=2, separator=" ", prefix_length=3)
+
+    assert generator.phrase() == "gop gop"
+
+
+def test_generator_rejects_invalid_prefix_length() -> None:
+    with pytest.raises(ValueError, match="prefix_length must be greater than zero"):
+        Generator(wordlist=["gopher"], words=1, prefix_length=0).phrase()
 
 
 def test_generator_capitalizes_words() -> None:
@@ -112,3 +128,12 @@ def test_cli_reads_custom_wordlist(tmp_path, capsys) -> None:
     assert main(["-w", "2", "-f", str(wordlist)]) == 0
 
     assert capsys.readouterr().out == "gopher gopher\n"
+
+
+def test_cli_uses_prefix_length(tmp_path, capsys) -> None:
+    wordlist = tmp_path / "wordlist.txt"
+    wordlist.write_text("11111\tgopher\n", encoding="utf-8")
+
+    assert main(["-w", "2", "-f", str(wordlist), "--prefix-length", "3"]) == 0
+
+    assert capsys.readouterr().out == "gop gop\n"
