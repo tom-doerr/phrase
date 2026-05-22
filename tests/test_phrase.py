@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from io import StringIO
 
@@ -10,7 +11,9 @@ from phrase import (
     Generator,
     UnknownLanguageError,
     available_languages,
+    digit_choices,
     generate,
+    prefix_entries,
     prefix_wordlist,
     read,
     read_file,
@@ -57,6 +60,10 @@ def test_generator_uses_custom_wordlist() -> None:
 
 
 def test_prefix_wordlist_keeps_unique_prefixes() -> None:
+    assert prefix_entries(["alpha", "alpine", "bravo"], 2) == [
+        ("al", "alpha"),
+        ("br", "bravo"),
+    ]
     assert prefix_wordlist(["alpha", "alpine", "bravo"], 2) == ["al", "br"]
 
 
@@ -64,6 +71,23 @@ def test_generator_uses_prefix_length() -> None:
     generator = Generator(wordlist=["gopher"], words=2, separator=" ", prefix_length=3)
 
     assert generator.phrase() == "gop gop"
+
+
+def test_generator_reports_full_words_for_prefix_length() -> None:
+    generator = Generator(wordlist=["gopher"], words=2, separator=" ", prefix_length=3)
+
+    assert generator.phrase_with_full_words() == ("gop gop", "gopher gopher")
+
+
+def test_generator_estimates_entropy() -> None:
+    assert Generator(wordlist=["alpha", "bravo"], words=3).entropy_bits() == 3
+    assert (
+        Generator(wordlist=["alpha", "alpine", "bravo"], words=2, prefix_length=2).entropy_bits()
+        == 2
+    )
+    assert Generator(wordlist=["alpha", "bravo"], words=1, digits=1).entropy_bits() == (
+        math.log2(2) + math.log2(10) + math.log2(2)
+    )
 
 
 def test_generator_rejects_invalid_prefix_length() -> None:
@@ -113,12 +137,20 @@ def test_random_number_bounds() -> None:
     assert 100 <= random_number(3) <= 999
 
 
+def test_digit_choices() -> None:
+    assert digit_choices(1) == 10
+    assert digit_choices(2) == 90
+
+
 def test_cli_generates_passphrases(capsys) -> None:
     assert main(["-w", "1", "-l", "en", "-p", "2"]) == 0
 
     lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 2
-    assert all(line in WORDLISTS["en"] for line in lines)
+    assert len(lines) == 4
+    assert lines[0] in WORDLISTS["en"]
+    assert lines[1] == "entropy: 12.92 bits"
+    assert lines[2] in WORDLISTS["en"]
+    assert lines[3] == "entropy: 12.92 bits"
 
 
 def test_cli_reads_custom_wordlist(tmp_path, capsys) -> None:
@@ -127,7 +159,7 @@ def test_cli_reads_custom_wordlist(tmp_path, capsys) -> None:
 
     assert main(["-w", "2", "-f", str(wordlist)]) == 0
 
-    assert capsys.readouterr().out == "gopher gopher\n"
+    assert capsys.readouterr().out == "gopher gopher\nentropy: 0.00 bits\n"
 
 
 def test_cli_uses_prefix_length(tmp_path, capsys) -> None:
@@ -136,4 +168,4 @@ def test_cli_uses_prefix_length(tmp_path, capsys) -> None:
 
     assert main(["-w", "2", "-f", str(wordlist), "--prefix-length", "3"]) == 0
 
-    assert capsys.readouterr().out == "gop gop\n"
+    assert capsys.readouterr().out == "gop gop\nfull: gopher gopher\nentropy: 0.00 bits\n"

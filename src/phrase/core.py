@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import math
 import re
 import secrets
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from random import SystemRandom
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, TypeVar
 
 _VALID_LINE = re.compile(r"^[1-6]{5}\t(.+)$")
 _LANGUAGES = ("de", "en", "fr", "nl")
 _SHUFFLER = SystemRandom()
+_T = TypeVar("_T")
 
 
 class UnknownLanguageError(ValueError):
@@ -57,28 +59,45 @@ def random_int(max_value: int) -> int:
     return secrets.randbelow(max_value)
 
 
-def prefix_wordlist(wordlist: Sequence[str], length: int) -> list[str]:
-    """Return sorted unique prefixes for a truncation length."""
+def prefix_entries(wordlist: Sequence[str], length: int) -> list[tuple[str, str]]:
+    """Return sorted unique prefixes paired with representative full words."""
     if length <= 0:
         raise ValueError("prefix_length must be greater than zero")
-    return sorted({word[:length] for word in wordlist})
+
+    entries: dict[str, str] = {}
+    for word in sorted(wordlist):
+        entries.setdefault(word[:length], word)
+    return sorted(entries.items())
+
+
+def prefix_wordlist(wordlist: Sequence[str], length: int) -> list[str]:
+    """Return sorted unique prefixes for a truncation length."""
+    return [prefix for prefix, _ in prefix_entries(wordlist, length)]
+
+
+def random_items(items: Sequence[_T], count: int) -> list[_T]:
+    """Return count secure random items from a sequence."""
+    if not items:
+        return []
+    return [items[random_int(len(items))] for _ in range(count)]
 
 
 def random_words(wordlist: Sequence[str], count: int) -> list[str]:
     """Return count secure random words from wordlist."""
-    if not wordlist:
-        return []
-    return [wordlist[random_int(len(wordlist))] for _ in range(count)]
+    return random_items(wordlist, count)
+
+
+def digit_choices(digits: int) -> int:
+    """Return the count of possible numbers for a digit length."""
+    if digits <= 0:
+        raise ValueError("digits must be greater than zero")
+    return 10 if digits == 1 else 9 * 10 ** (digits - 1)
 
 
 def random_number(digits: int) -> int:
     """Return a secure random number with the requested number of digits."""
-    if digits <= 0:
-        raise ValueError("random_number: digits must be greater than zero")
-
     minimum = 0 if digits == 1 else 10 ** (digits - 1)
-    width = 10**digits - minimum
-    return random_int(width) + minimum
+    return random_int(digit_choices(digits)) + minimum
 
 
 @dataclass(slots=True)
@@ -93,7 +112,7 @@ class Generator:
     digits: int = 0
     prefix_length: int | None = None
 
-    def phrase(self) -> str:
+    def _resolve_wordlist(self) -> Sequence[str] | None:
         wordlist = self.wordlist
         if self.language and not wordlist:
             try:
@@ -101,19 +120,64 @@ class Generator:
             except KeyError as exc:
                 raise UnknownLanguageError(f"no such language: {self.language}") from exc
             self.wordlist = wordlist
+        return wordlist
 
+    def _selected_tokens(self) -> tuple[list[str], list[str] | None]:
+        wordlist = self._resolve_wordlist()
+        full_words = None
         if self.prefix_length is not None:
-            wordlist = prefix_wordlist(wordlist or [], self.prefix_length)
+            entries = random_items(prefix_entries(wordlist or [], self.prefix_length), self.words)
+            passphrase = [prefix for prefix, _ in entries]
+            full_words = [word for _, word in entries]
+        else:
+            passphrase = random_words(wordlist or [], self.words)
 
-        passphrase = random_words(wordlist or [], self.words)
         if self.capitalize:
             passphrase = [word.title() for word in passphrase]
+            if full_words is not None:
+                full_words = [word.title() for word in full_words]
 
         if self.digits > 0:
-            passphrase.append(str(random_number(self.digits)))
-            _SHUFFLER.shuffle(passphrase)
+            number = str(random_number(self.digits))
+            if full_words is None:
+                passphrase.append(number)
+                _SHUFFLER.shuffle(passphrase)
+            else:
+                pairs = list(zip(passphrase, full_words))
+                pairs.append((number, number))
+                _SHUFFLER.shuffle(pairs)
+                passphrase = [prefix for prefix, _ in pairs]
+                full_words = [word for _, word in pairs]
 
+        return passphrase, full_words
+
+    def entropy_bits(self) -> float:
+        wordlist = self._resolve_wordlist() or []
+        word_slots = max(self.words, 0)
+        if self.prefix_length is not None:
+            choice_count = len(prefix_entries(wordlist, self.prefix_length))
+        else:
+            choice_count = len(wordlist)
+
+        entropy = 0.0
+        if word_slots > 0 and choice_count > 0:
+            entropy += word_slots * math.log2(choice_count)
+
+        if self.digits > 0:
+            entropy += math.log2(digit_choices(self.digits))
+            if word_slots > 0 and choice_count > 0:
+                entropy += math.log2(word_slots + 1)
+
+        return entropy
+
+    def phrase(self) -> str:
+        passphrase, _ = self._selected_tokens()
         return self.separator.join(passphrase)
+
+    def phrase_with_full_words(self) -> tuple[str, str | None]:
+        passphrase, full_words = self._selected_tokens()
+        full_phrase = self.separator.join(full_words) if full_words is not None else None
+        return self.separator.join(passphrase), full_phrase
 
 
 def generate(

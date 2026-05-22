@@ -5,7 +5,9 @@ from .core import (
     Generator,
     UnknownLanguageError,
     available_languages,
+    digit_choices,
     generate,
+    prefix_entries,
     prefix_wordlist,
     read,
     read_file,
@@ -16,10 +18,12 @@ __all__ = [
     "UnknownLanguageError",
     "WORDLISTS",
     "available_languages",
+    "digit_choices",
     "generate",
+    "prefix_entries",
     "prefix_wordlist",
     "read",
     "read_file",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
