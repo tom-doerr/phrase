@@ -82,9 +82,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         entropy_bits = generator.entropy_bits()
         for _ in range(args.passphrases):
             phrase, full_phrase = generator.phrase_with_full_words()
-            print(phrase)
             if full_phrase is not None:
-                print(f"full: {full_phrase}")
+                print(full_phrase)
+            print(phrase)
             print(f"entropy: {entropy_bits:.2f} bits")
     except (OSError, ValueError) as exc:
         parser.exit(1, f"{parser.prog}: {exc}\n")

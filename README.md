@@ -38,8 +38,8 @@ Generate random passphrase:
 Generate a German passphrase from unique four-character word prefixes:
 
     $ phrase -l de -w 6 --prefix-length 4
+    erdbeben schwer dynamit neidisch muffin reizvoll
     erdb schw dyna neid muff reiz
-    full: erdbeben schwer dynamit neidisch muffin reizvoll
     entropy: 72.21 bits
 
 Use the Python API:

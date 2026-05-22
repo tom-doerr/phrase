@@ -168,4 +168,4 @@ def test_cli_uses_prefix_length(tmp_path, capsys) -> None:
 
     assert main(["-w", "2", "-f", str(wordlist), "--prefix-length", "3"]) == 0
 
-    assert capsys.readouterr().out == "gop gop\nfull: gopher gopher\nentropy: 0.00 bits\n"
+    assert capsys.readouterr().out == "gopher gopher\ngop gop\nentropy: 0.00 bits\n"
