@@ -39,6 +39,10 @@ Generate random passphrase:
     $ phrase
     correct horse battery staple
 
+Generate several outputs in any mode with `-n`/`--count`. The older `-p`/`--passphrases` option is still accepted as an alias:
+
+    $ phrase --count 3
+
 Generate a German passphrase from unique three-character word prefixes:
 
     $ phrase -l de -w 8 --prefix-length 3

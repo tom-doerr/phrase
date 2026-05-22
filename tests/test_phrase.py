@@ -160,6 +160,20 @@ def test_cli_generates_passphrases(capsys) -> None:
     assert lines[3] == "entropy: 12.92 bits"
 
 
+def test_cli_count_alias_generates_passphrases(tmp_path, capsys) -> None:
+    wordlist = tmp_path / "wordlist.txt"
+    wordlist.write_text("11111\tgopher\n", encoding="utf-8")
+
+    assert main(["-w", "1", "-f", str(wordlist), "--count", "2"]) == 0
+
+    assert capsys.readouterr().out == (
+        "gopher\n"
+        "entropy: 0.00 bits\n"
+        "gopher\n"
+        "entropy: 0.00 bits\n"
+    )
+
+
 def test_cli_reads_custom_wordlist(tmp_path, capsys) -> None:
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("11111\tgopher\n", encoding="utf-8")
@@ -350,6 +364,47 @@ def test_cli_llm_prefix_prints_audit_trail(monkeypatch, capsys) -> None:
         "mnemonic: marble raven\n"
         "entropy: 20.00 bits = 2 x log2(1024)\n"
         "model: test/base@rev\n"
+        "prefix length: 3\n"
+        "candidate counts: 1024 1024\n"
+    )
+
+
+def test_cli_llm_prefix_count_alias_generates_multiple(monkeypatch, capsys) -> None:
+    calls = []
+
+    def fake_generate(**kwargs):
+        calls.append(kwargs)
+        index = len(calls)
+        return LlmPrefixResult(
+            password=f"mar-rav-{index}",
+            mnemonic=f"marble raven {index}",
+            prefixes=["mar", "rav"],
+            words=["marble", "raven"],
+            candidate_counts=[1024, 1024],
+            entropy_bits=20.0,
+            model_id="test/base",
+            model_revision=None,
+            prefix_length=3,
+            choices_per_step=1024,
+        )
+
+    monkeypatch.setattr("phrase.cli.generate_llm_prefix_phrase", fake_generate)
+
+    assert main(["llm-prefix", "--words", "2", "--model", "test/base", "--count", "2"]) == 0
+
+    assert len(calls) == 2
+    assert capsys.readouterr().out == (
+        "password: mar-rav-1\n"
+        "mnemonic: marble raven 1\n"
+        "entropy: 20.00 bits = 2 x log2(1024)\n"
+        "model: test/base\n"
+        "prefix length: 3\n"
+        "candidate counts: 1024 1024\n"
+        "\n"
+        "password: mar-rav-2\n"
+        "mnemonic: marble raven 2\n"
+        "entropy: 20.00 bits = 2 x log2(1024)\n"
+        "model: test/base\n"
         "prefix length: 3\n"
         "candidate counts: 1024 1024\n"
     )

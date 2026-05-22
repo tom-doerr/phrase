@@ -34,6 +34,16 @@ def _installed_version() -> str:
         return __version__
 
 
+def _positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="phrase",
@@ -98,9 +108,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-p",
         "--passphrases",
-        type=int,
+        "-n",
+        "--count",
+        dest="passphrases",
+        metavar="COUNT",
+        type=_positive_int,
         default=1,
-        help="Passphrases to generate",
+        help="Complete outputs to generate",
     )
     parser.add_argument(
         "--version",
@@ -180,9 +194,13 @@ def build_llm_prefix_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-p",
         "--passphrases",
-        type=int,
+        "-n",
+        "--count",
+        dest="passphrases",
+        metavar="COUNT",
+        type=_positive_int,
         default=1,
-        help="Passphrases to generate",
+        help="Complete outputs to generate",
     )
     parser.add_argument(
         "--version",
