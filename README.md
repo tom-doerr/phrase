@@ -5,6 +5,16 @@ random words.
 
 ## Installation
 
+### Python
+
+Install the Python package from PyPI:
+
+    $ python -m pip install diceware-phrase
+
+Or install the current checkout for development:
+
+    $ python -m pip install -e ".[dev]"
+
 ### Download
 
 Just download the
@@ -25,10 +35,26 @@ Generate random passphrase:
     $ phrase
     correct horse battery staple
 
+Use the Python API:
+
+    >>> from phrase import generate
+    >>> generate()
+    'correct horse battery staple'
+
 Getting help:
 
     $ phrase -h
     ...
+
+## Python packaging
+
+Build the source distribution and wheel:
+
+    $ python -m build
+
+Validate the distribution metadata before uploading:
+
+    $ python -m twine check dist/*
 
 ## License
 
