@@ -15,9 +15,9 @@ Or install the current checkout for development:
 
     $ python -m pip install -e ".[dev]"
 
-Install local mnemonic-generation dependencies when you want `--mnemonic`:
+Install local LLM dependencies when you want `--mnemonic` or `llm-prefix`:
 
-    $ python -m pip install -e ".[mnemonic]"
+    $ python -m pip install -e ".[llm]"
 
 ### Download
 
@@ -53,6 +53,18 @@ Generate a local-only mnemonic after the password material is fixed. The model i
     rom emm spi bah but lit zin fro
     mnemonic: Rommee-Emmy spickt Bahn-Butter-Litschi, zinkt Frost.
     entropy: 85.55 bits
+
+Generate prefixes from local base-LM ranked candidate sets, while keeping the entropy source as uniform CSPRNG selection over the actual normalized prefix set. The default model is `Qwen/Qwen3-8B-Base`; pass `--model` for any Hugging Face model id or local path:
+
+    $ phrase llm-prefix --words 10 --prefix-length 3 --choices-per-step 1024
+    password: mar-rav-lun-cof-yel-fog-sto-gar-elu-nar
+    mnemonic: marble raven lunar coffee yellow fog stone garden elusive narrator
+    entropy: 100.00 bits = 10 x log2(1024)
+    model: Qwen/Qwen3-8B-Base
+    prefix length: 3
+    candidate counts: 1024 1024 1024 1024 1024 1024 1024 1024 1024 1024
+
+Use `--model-revision` to pin a Hugging Face revision and `--local-files-only` to require an already cached model or local model path. If a step cannot find the requested number of unique prefixes, the command fails unless `--allow-shortfall` is set; entropy is always computed from the printed candidate counts.
 
 Use the Python API:
 

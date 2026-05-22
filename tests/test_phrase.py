@@ -20,6 +20,12 @@ from phrase import (
 )
 from phrase.cli import main
 from phrase.core import random_int, random_number
+from phrase.llm_prefix import (
+    LlmPrefixResult,
+    generate_llm_prefix_phrase,
+    normalize_prefix,
+    unique_prefixes_from_token_ids,
+)
 from phrase.mnemonic import build_prompt
 
 
@@ -213,4 +219,120 @@ def test_cli_generates_local_mnemonic(monkeypatch, tmp_path, capsys) -> None:
         "gop\n"
         "mnemonic: Gopher remembers gop.\n"
         "entropy: 0.00 bits\n"
+    )
+
+
+class FakePrefixTokenizer:
+    all_special_ids = [99]
+    eos_token_id = 99
+    token_text = {
+        0: " marble",
+        1: " market",
+        2: " raven",
+        3: " lunar",
+        4: " 4bad",
+        5: " Überfall",
+        99: "<eos>",
+    }
+
+    def decode(self, ids, **kwargs):
+        return self.token_text[ids[0]]
+
+
+def test_normalize_prefix_folds_and_rejects_ambiguous_tokens() -> None:
+    assert normalize_prefix(" Station", 3) == "sta"
+    assert normalize_prefix("ĠRaven", 3) == "rav"
+    assert normalize_prefix(" Überfall", 3) == "ueb"
+    assert normalize_prefix(" st", 3) is None
+    assert normalize_prefix(" 123abc", 3) is None
+
+
+def test_unique_prefixes_deduplicates_password_prefixes() -> None:
+    tokenizer = FakePrefixTokenizer()
+
+    assert unique_prefixes_from_token_ids(
+        tokenizer,
+        [0, 1, 2, 99, 3, 4, 5],
+        prefix_length=3,
+        limit=4,
+    ) == ["mar", "rav", "lun", "ueb"]
+
+
+def test_generate_llm_prefix_phrase_uses_uniform_prefix_choices(monkeypatch) -> None:
+    tokenizer = FakePrefixTokenizer()
+    choices = [1, 0]
+
+    monkeypatch.setattr("phrase.llm_prefix._load_model", lambda *args: (tokenizer, object(), object()))
+    monkeypatch.setattr("phrase.llm_prefix._ranked_next_token_ids", lambda *args: [0, 1, 2, 3])
+    monkeypatch.setattr(
+        "phrase.llm_prefix._complete_word",
+        lambda tokenizer, model, torch, context, prefix, **kwargs: f"{prefix}word",
+    )
+    monkeypatch.setattr("phrase.llm_prefix.random_int", lambda limit: choices.pop(0))
+
+    result = generate_llm_prefix_phrase(
+        model_id="test/base",
+        model_revision="abc123",
+        words=2,
+        prefix_length=3,
+        choices_per_step=2,
+        scan_tokens=4,
+        separator="-",
+    )
+
+    assert result.password == "rav-mar"
+    assert result.mnemonic == "ravword marword"
+    assert result.candidate_counts == [2, 2]
+    assert result.entropy_bits == 2.0
+    assert result.entropy_formula == "2 x log2(2)"
+    assert result.model_id == "test/base"
+    assert result.model_revision == "abc123"
+
+
+def test_generate_llm_prefix_phrase_fails_on_shortfall(monkeypatch) -> None:
+    tokenizer = FakePrefixTokenizer()
+
+    monkeypatch.setattr("phrase.llm_prefix._load_model", lambda *args: (tokenizer, object(), object()))
+    monkeypatch.setattr("phrase.llm_prefix._ranked_next_token_ids", lambda *args: [0, 1])
+
+    with pytest.raises(ValueError, match="only 1 unique prefixes found at position 1"):
+        generate_llm_prefix_phrase(
+            words=1,
+            prefix_length=3,
+            choices_per_step=2,
+            scan_tokens=2,
+        )
+
+
+def test_cli_llm_prefix_prints_audit_trail(monkeypatch, capsys) -> None:
+    def fake_generate(**kwargs):
+        assert kwargs["model_id"] == "test/base"
+        assert kwargs["model_revision"] == "rev"
+        assert kwargs["words"] == 2
+        assert kwargs["prefix_length"] == 3
+        assert kwargs["choices_per_step"] == 1024
+        return LlmPrefixResult(
+            password="mar-rav",
+            mnemonic="marble raven",
+            prefixes=["mar", "rav"],
+            words=["marble", "raven"],
+            candidate_counts=[1024, 1024],
+            entropy_bits=20.0,
+            model_id="test/base",
+            model_revision="rev",
+            prefix_length=3,
+            choices_per_step=1024,
+        )
+
+    monkeypatch.setattr("phrase.cli.generate_llm_prefix_phrase", fake_generate)
+
+    assert main(["llm-prefix", "--words", "2", "--model", "test/base", "--model-revision", "rev"]) == 0
+
+    assert capsys.readouterr().out == (
+        "password: mar-rav\n"
+        "mnemonic: marble raven\n"
+        "entropy: 20.00 bits = 2 x log2(1024)\n"
+        "model: test/base@rev\n"
+        "prefix length: 3\n"
+        "candidate counts: 1024 1024\n"
     )
