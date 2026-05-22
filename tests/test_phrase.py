@@ -22,6 +22,7 @@ from phrase.cli import main
 from phrase.core import random_int, random_number
 from phrase.llm_prefix import (
     LlmPrefixResult,
+    _complete_word,
     generate_llm_prefix_phrase,
     normalize_prefix,
     unique_prefixes_from_token_ids,
@@ -270,6 +271,17 @@ class FakePrefixTokenizer:
         return self.token_text[ids[0]]
 
 
+class FakeCompletionTokenizer:
+    all_special_ids = [99]
+    eos_token_id = 99
+
+    def __init__(self, token_text):
+        self.token_text = token_text
+
+    def decode(self, ids, **kwargs):
+        return self.token_text[ids[0]]
+
+
 def test_normalize_prefix_folds_and_rejects_ambiguous_tokens() -> None:
     assert normalize_prefix(" Station", 3) == "sta"
     assert normalize_prefix("ĠRaven", 3) == "rav"
@@ -287,6 +299,79 @@ def test_unique_prefixes_deduplicates_password_prefixes() -> None:
         prefix_length=3,
         limit=4,
     ) == ["mar", "rav", "lun", "ueb"]
+
+
+def test_complete_word_uses_most_likely_same_word_continuation(monkeypatch) -> None:
+    tokenizer = FakeCompletionTokenizer({0: "ble", 1: " "})
+    contexts = []
+
+    def fake_ranked_next_token_ids(tokenizer, model, torch, context, scan_tokens):
+        assert scan_tokens == 1
+        contexts.append(context)
+        return [0] if len(contexts) == 1 else [1]
+
+    monkeypatch.setattr("phrase.llm_prefix._ranked_next_token_ids", fake_ranked_next_token_ids)
+
+    assert (
+        _complete_word(
+            tokenizer,
+            object(),
+            object(),
+            "The ",
+            "mar",
+            max_word_tokens=8,
+            temperature=0.7,
+        )
+        == "marble"
+    )
+    assert contexts == ["The mar", "The marble"]
+
+
+def test_complete_word_stops_before_next_word_sampling(monkeypatch) -> None:
+    tokenizer = FakeCompletionTokenizer({0: " next", 1: "ble"})
+
+    monkeypatch.setattr(
+        "phrase.llm_prefix._ranked_next_token_ids",
+        lambda tokenizer, model, torch, context, scan_tokens: [0],
+    )
+
+    assert (
+        _complete_word(
+            tokenizer,
+            object(),
+            object(),
+            "The ",
+            "mar",
+            max_word_tokens=8,
+            temperature=0.7,
+        )
+        == "mar"
+    )
+
+
+def test_complete_word_accepts_token_that_also_ends_word(monkeypatch) -> None:
+    tokenizer = FakeCompletionTokenizer({0: "ble,"})
+    calls = []
+
+    def fake_ranked_next_token_ids(tokenizer, model, torch, context, scan_tokens):
+        calls.append(context)
+        return [0]
+
+    monkeypatch.setattr("phrase.llm_prefix._ranked_next_token_ids", fake_ranked_next_token_ids)
+
+    assert (
+        _complete_word(
+            tokenizer,
+            object(),
+            object(),
+            "The ",
+            "mar",
+            max_word_tokens=8,
+            temperature=0.7,
+        )
+        == "marble"
+    )
+    assert calls == ["The mar"]
 
 
 def test_generate_llm_prefix_phrase_uses_uniform_prefix_choices(monkeypatch) -> None:

@@ -108,6 +108,33 @@ def _leading_letters(text: str) -> str:
     return _fold_ascii("".join(letters))
 
 
+def _same_word_continuation(token_text: str) -> tuple[str, bool] | None:
+    """Return folded continuation letters and whether the token also ends the word."""
+    if not token_text:
+        return None
+
+    text = token_text
+    if text.startswith("##"):
+        text = text[2:]
+    if not text or text[0].isspace() or text.startswith(("Ġ", "▁")):
+        return None
+    if unicodedata.category(text[0]).startswith("P"):
+        return None
+
+    letters: list[str] = []
+    for char in text:
+        if not char.isalpha():
+            break
+        letters.append(char)
+    if not letters:
+        return None
+
+    folded = _fold_ascii("".join(letters))
+    if not folded or not _ASCII_LETTERS.fullmatch(folded):
+        return None
+    return folded, len(letters) < len(text)
+
+
 def normalize_prefix(token_text: str, prefix_length: int) -> str | None:
     """Return an ASCII lowercase password prefix from decoded token text."""
     if prefix_length <= 0:
@@ -201,24 +228,28 @@ def _complete_word(
     if max_word_tokens <= 0:
         return prefix
 
-    inputs = _tokenize_on_model(tokenizer, model, context + prefix)
-    prompt_length = inputs["input_ids"].shape[-1]
-    with torch.inference_mode():
-        output = model.generate(
-            **inputs,
-            do_sample=True,
-            temperature=temperature,
-            max_new_tokens=max_word_tokens,
-            pad_token_id=tokenizer.eos_token_id,
-        )[0]
+    _ = temperature  # Kept for API compatibility; completion is rank-based.
+    current_context = context + prefix
+    suffix_parts: list[str] = []
+    special_ids = set(getattr(tokenizer, "all_special_ids", []) or [])
 
-    generated = tokenizer.decode(
-        output[prompt_length:],
-        skip_special_tokens=True,
-        clean_up_tokenization_spaces=False,
-    )
-    suffix = _leading_letters(generated)
-    return prefix + suffix
+    for _ in range(max_word_tokens):
+        token_ids = _ranked_next_token_ids(tokenizer, model, torch, current_context, 1)
+        if not token_ids or token_ids[0] in special_ids:
+            break
+
+        token_text = tokenizer.decode([token_ids[0]], clean_up_tokenization_spaces=False)
+        continuation = _same_word_continuation(token_text)
+        if continuation is None:
+            break
+
+        letters, ends_word = continuation
+        suffix_parts.append(letters)
+        current_context += token_text
+        if ends_word:
+            break
+
+    return prefix + "".join(suffix_parts)
 
 
 def generate_llm_prefix_phrase(

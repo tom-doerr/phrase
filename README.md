@@ -68,7 +68,7 @@ Generate prefixes from local base-LM ranked candidate sets, while keeping the en
     prefix length: 3
     candidate counts: 1024 1024 1024 1024 1024 1024 1024 1024 1024 1024
 
-Use `--model-revision` to pin a Hugging Face revision and `--local-files-only` to require an already cached model or local model path. If a step cannot find the requested number of unique prefixes, the command fails unless `--allow-shortfall` is set; entropy is always computed from the printed candidate counts.
+Use `--model-revision` to pin a Hugging Face revision and `--local-files-only` to require an already cached model or local model path. If a step cannot find the requested number of unique prefixes, the command fails unless `--allow-shortfall` is set; entropy is always computed from the printed candidate counts. After each random prefix choice, mnemonic words are completed with the model's most likely same-word continuation tokens; the next uniform choice happens only at the next word start.
 
 Use the Python API:
 

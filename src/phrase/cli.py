@@ -184,7 +184,7 @@ def build_llm_prefix_parser() -> argparse.ArgumentParser:
         "--temperature",
         type=float,
         default=DEFAULT_LLM_PREFIX_TEMPERATURE,
-        help="Sampling temperature for mnemonic word completion",
+        help="Compatibility option; llm-prefix word completion is rank-based",
     )
     parser.add_argument(
         "--allow-shortfall",
