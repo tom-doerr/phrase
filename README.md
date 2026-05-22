@@ -46,7 +46,7 @@ Generate a German passphrase from unique three-character word prefixes:
     rom emm spi bah but lit zin fro
     entropy: 85.55 bits
 
-Generate a local-only mnemonic after the password material is fixed. The model is loaded in-process through Hugging Face Transformers; the LLM only sees the already-generated password material and must not choose or alter it:
+Generate a local-only mnemonic after the password material is fixed. The model is loaded in-process through Hugging Face Transformers; the LLM only sees the already-generated password material and must not choose or alter it. Thinking models may print their thinking process, and the CLI guarantees a final `Mnemonic sentence:` marker if the model stops before producing one:
 
     $ phrase -l de -w 8 --prefix-length 3 --mnemonic --mnemonic-model Qwen/Qwen3.5-0.8B
     rommee emmy spicken bahn butter litschi zinken frost

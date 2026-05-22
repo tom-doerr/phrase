@@ -18,7 +18,13 @@ from .llm_prefix import (
     DEFAULT_TEMPERATURE as DEFAULT_LLM_PREFIX_TEMPERATURE,
     generate_llm_prefix_phrase,
 )
-from .mnemonic import DEFAULT_MNEMONIC_MODEL, MnemonicDependencyError, generate_mnemonic
+from .mnemonic import (
+    DEFAULT_MAX_NEW_TOKENS as DEFAULT_MNEMONIC_MAX_NEW_TOKENS,
+    DEFAULT_MNEMONIC_MODEL,
+    DEFAULT_TEMPERATURE as DEFAULT_MNEMONIC_TEMPERATURE,
+    MnemonicDependencyError,
+    generate_mnemonic,
+)
 
 
 def _installed_version() -> str:
@@ -72,13 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mnemonic-max-new-tokens",
         type=int,
-        default=96,
+        default=DEFAULT_MNEMONIC_MAX_NEW_TOKENS,
         help="Maximum tokens to generate for mnemonic output",
     )
     parser.add_argument(
         "--mnemonic-temperature",
         type=float,
-        default=0.6,
+        default=DEFAULT_MNEMONIC_TEMPERATURE,
         help="Sampling temperature for mnemonic output",
     )
     parser.add_argument(

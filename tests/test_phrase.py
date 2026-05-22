@@ -26,7 +26,7 @@ from phrase.llm_prefix import (
     normalize_prefix,
     unique_prefixes_from_token_ids,
 )
-from phrase.mnemonic import build_prompt
+from phrase.mnemonic import DEFAULT_MAX_NEW_TOKENS, build_prompt, ensure_final_mnemonic
 
 
 def test_wordlists_are_available() -> None:
@@ -185,6 +185,22 @@ def test_build_prompt_keeps_password_and_mnemonic_separate() -> None:
     assert "Do not change" in prompt
 
 
+def test_ensure_final_mnemonic_appends_fallback_after_visible_thinking() -> None:
+    assert ensure_final_mnemonic(
+        "Thinking Process: still choosing",
+        "pec bez puz",
+        "pech bezahlen puzzeln",
+    ) == "Thinking Process: still choosing Mnemonic sentence: pech bezahlen puzzeln."
+
+
+def test_ensure_final_mnemonic_keeps_model_final_sentence() -> None:
+    assert ensure_final_mnemonic(
+        "Thinking Process: done Mnemonic sentence: pech bezahlt puzzelnde Pferde.",
+        "pec bez puz",
+        "pech bezahlen puzzeln",
+    ) == "Thinking Process: done Mnemonic sentence: pech bezahlt puzzelnde Pferde."
+
+
 def test_cli_generates_local_mnemonic(monkeypatch, tmp_path, capsys) -> None:
     wordlist = tmp_path / "wordlist.txt"
     wordlist.write_text("11111\tgopher\n", encoding="utf-8")
@@ -193,6 +209,7 @@ def test_cli_generates_local_mnemonic(monkeypatch, tmp_path, capsys) -> None:
         assert prefix_phrase == "gop"
         assert full_phrase == "gopher"
         assert kwargs["model_id"] == "test/model"
+        assert kwargs["max_new_tokens"] == DEFAULT_MAX_NEW_TOKENS
         return "Gopher remembers gop."
 
     monkeypatch.setattr("phrase.cli.generate_mnemonic", fake_mnemonic)

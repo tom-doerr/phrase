@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 DEFAULT_MNEMONIC_MODEL = "Qwen/Qwen3.5-0.8B"
-DEFAULT_MAX_NEW_TOKENS = 96
+DEFAULT_MAX_NEW_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.6
+_FINAL_MNEMONIC = re.compile(r"\bmnemonic sentence\s*:", re.IGNORECASE)
 
 
 class MnemonicDependencyError(RuntimeError):
@@ -38,11 +40,17 @@ def build_prompt(prefix_phrase: str, full_phrase: str | None = None) -> str:
         context += f"\nFull source words: {full_phrase}"
 
     return (
-        "Create one short, vivid, memorable mnemonic sentence for a password.\n"
-        "The password is exactly the prefix sequence. Do not change, sort, omit, translate, "
-        "or add prefixes. Do not include warnings or explanation.\n"
+        "Create one short, vivid, memorable mnemonic sentence for remembering a password.\n"
+        "The actual password is exactly the prefix sequence; the mnemonic is only a memory aid. "
+        "Do not change, sort, omit, or add password prefixes. The mnemonic sentence may use "
+        "the full source words or other words that start with those prefixes, as long as their "
+        "order matches the password prefixes. Use this exact output format and do not add extra "
+        "analysis:\n"
+        "Thinking Process:\n"
+        "1. Map the prefixes to source or same-prefix memory words.\n"
+        "2. Choose one vivid sentence that preserves the prefix order.\n"
+        "Mnemonic sentence: <one sentence>\n"
         f"{context}\n"
-        "Return only the mnemonic sentence."
     )
 
 
@@ -50,6 +58,20 @@ def _decode_response(tokenizer, output_ids, prompt_length: int) -> str:
     generated = output_ids[prompt_length:]
     text = tokenizer.decode(generated, skip_special_tokens=True).strip()
     return " ".join(text.split())
+
+
+def ensure_final_mnemonic(text: str, prefix_phrase: str, full_phrase: str | None = None) -> str:
+    """Append a final mnemonic marker when a thinking model stops before one."""
+    cleaned = " ".join(text.split())
+    if _FINAL_MNEMONIC.search(cleaned):
+        return cleaned
+
+    fallback = (full_phrase or prefix_phrase).strip().rstrip(".")
+    if not fallback:
+        return cleaned
+    if cleaned:
+        return f"{cleaned} Mnemonic sentence: {fallback}."
+    return f"Mnemonic sentence: {fallback}."
 
 
 def generate_mnemonic(
@@ -94,6 +116,9 @@ def generate_mnemonic(
             temperature=temperature,
             max_new_tokens=max_new_tokens,
             pad_token_id=tokenizer.eos_token_id,
+            remove_invalid_values=True,
+            renormalize_logits=True,
         )[0]
 
-    return _decode_response(tokenizer, output, prompt_length)
+    text = _decode_response(tokenizer, output, prompt_length)
+    return ensure_final_mnemonic(text, prefix_phrase, full_phrase)
